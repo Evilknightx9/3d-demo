@@ -28,19 +28,25 @@
         
         const { width, height } = container.getBoundingClientRect();
         
-        // Three.js setup
+        // Three.js setup - optimized performance
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+        
+        // Disable antialiasing on mobile for better performance
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
         const renderer = new THREE.WebGLRenderer({ 
             alpha: true, 
-            antialias: true 
+            antialias: !isMobile, // Disable antialiasing on mobile
+            powerPreference: "high-performance",
+            stencil: false,
+            depth: true
         });
         
         renderer.setSize(width, height);
         // Limit pixel ratio more aggressively for performance
-        const isMobile = window.matchMedia('(max-width: 768px)').matches;
         const maxPixelRatio = isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5);
         renderer.setPixelRatio(maxPixelRatio);
+        renderer.shadowMap.enabled = false; // Disable shadows for performance
         container.appendChild(renderer.domElement);
         
         camera.position.set(0, 0, 10);
@@ -68,30 +74,18 @@
         };
         window.addEventListener('scroll', handleScroll, { passive: true });
         
-        // Enhanced Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        // Optimized Lighting - Reduced lights for better performance
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
         
-        // Multiple colored lights for better effect
-        const light1 = new THREE.DirectionalLight(0x6366f1, 1.2);
+        // Reduced to 2 lights instead of 5 for better performance
+        const light1 = new THREE.DirectionalLight(0x6366f1, 1.0);
         light1.position.set(5, 5, 5);
         scene.add(light1);
         
-        const light2 = new THREE.DirectionalLight(0x8b5cf6, 0.8);
+        const light2 = new THREE.PointLight(0x8b5cf6, 0.8, 50);
         light2.position.set(-5, 3, -5);
         scene.add(light2);
-        
-        const light3 = new THREE.PointLight(0xa78bfa, 0.6);
-        light3.position.set(0, 0, 5);
-        scene.add(light3);
-        
-        const pointLight1 = new THREE.PointLight(0x6366f1, 0.8, 50);
-        pointLight1.position.set(3, -3, 3);
-        scene.add(pointLight1);
-        
-        const pointLight2 = new THREE.PointLight(0x8b5cf6, 0.6, 50);
-        pointLight2.position.set(-3, 3, 3);
-        scene.add(pointLight2);
         
         let currentModel = null;
         let animationMixer = null;
@@ -101,18 +95,22 @@
         function createDefaultObjects() {
             const objects = [];
             
-            // Create multiple floating geometric shapes with varied sizes
+            // Optimized geometries with reduced detail for better performance
+            const isLowPerf = isLowPerformanceDevice();
+            const torusSegments = isLowPerf ? 8 : 16;
+            const sphereSegments = isLowPerf ? 12 : 16;
+            
             const geometries = [
                 { geo: new THREE.OctahedronGeometry(2, 0), size: 1.2 },
                 { geo: new THREE.TetrahedronGeometry(1.8, 0), size: 1.0 },
                 { geo: new THREE.IcosahedronGeometry(1.6, 0), size: 1.1 },
-                { geo: new THREE.TorusGeometry(1.2, 0.5, 16, 100), size: 1.0 },
+                { geo: new THREE.TorusGeometry(1.2, 0.5, torusSegments, torusSegments), size: 1.0 }, // Reduced from 100 to torusSegments
                 { geo: new THREE.BoxGeometry(2, 2, 2), size: 1.2 },
                 { geo: new THREE.DodecahedronGeometry(1.6, 0), size: 1.1 },
                 { geo: new THREE.ConeGeometry(1.2, 2.5, 8), size: 1.0 },
-                { geo: new THREE.CylinderGeometry(1, 1, 2.5, 16), size: 1.0 },
-                { geo: new THREE.TorusKnotGeometry(1.2, 0.4, 100, 16), size: 1.1 },
-                { geo: new THREE.SphereGeometry(1.5, 32, 32), size: 1.0 }
+                { geo: new THREE.CylinderGeometry(1, 1, 2.5, 12), size: 1.0 }, // Reduced from 16 to 12
+                { geo: new THREE.TorusKnotGeometry(1.2, 0.4, torusSegments * 3, torusSegments), size: 1.1 }, // Reduced from 100 to torusSegments*3
+                { geo: new THREE.SphereGeometry(1.5, sphereSegments, sphereSegments), size: 1.0 } // Reduced from 32x32 to sphereSegments
             ];
             
             // Color palette for variety
@@ -141,28 +139,25 @@
                 const color = colors[index % colors.length];
                 const size = geomData.size;
                 
-                // Enhanced wireframe material with glow
+                // Optimized materials - use simpler materials for better performance
+                // Shared materials for better performance (reuse instead of creating new)
                 const wireframeMaterial = new THREE.MeshBasicMaterial({
                     color: color,
                     wireframe: true,
                     transparent: true,
                     opacity: 0.7,
-                    side: THREE.DoubleSide
+                    side: THREE.FrontSide // Changed from DoubleSide to FrontSide
                 });
                 
-                // Enhanced solid material with better glow
-                const solidMaterial = new THREE.MeshStandardMaterial({
+                // Use MeshBasicMaterial instead of MeshStandardMaterial for better performance
+                const solidMaterial = new THREE.MeshBasicMaterial({
                     color: color,
-                    metalness: 0.9,
-                    roughness: 0.1,
-                    emissive: color,
-                    emissiveIntensity: 0.5,
                     transparent: true,
                     opacity: 0.5,
-                    side: THREE.DoubleSide
+                    side: THREE.FrontSide
                 });
                 
-                // Create wireframe mesh with scaling
+                // Create wireframe mesh - reduced from 3 meshes to 2 for performance
                 const wireframe = new THREE.Mesh(geomData.geo, wireframeMaterial);
                 wireframe.position.set(pos.x, pos.y, pos.z);
                 wireframe.scale.set(size, size, size);
@@ -171,27 +166,14 @@
                 // Create solid mesh for depth
                 const solid = new THREE.Mesh(geomData.geo, solidMaterial);
                 solid.position.set(pos.x, pos.y, pos.z);
-                solid.scale.set(size * 0.95, size * 0.95, size * 0.95); // Slightly smaller
+                solid.scale.set(size * 0.95, size * 0.95, size * 0.95);
                 scene.add(solid);
                 
-                // Add glow effect using additional mesh
-                const glowGeometry = geomData.geo.clone();
-                const glowMaterial = new THREE.MeshBasicMaterial({
-                    color: color,
-                    transparent: true,
-                    opacity: 0.2,
-                    side: THREE.BackSide
-                });
-                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-                glow.position.set(pos.x, pos.y, pos.z);
-                glow.scale.set(size * 1.2, size * 1.2, size * 1.2);
-                scene.add(glow);
-                
-                // Store for animation
+                // Store for animation - removed glow mesh for better performance
                 objects.push({
                     wireframe: wireframe,
                     solid: solid,
-                    glow: glow,
+                    glow: null, // Removed glow mesh
                     basePosition: { x: pos.x, y: pos.y, z: pos.z },
                     rotationSpeed: {
                         x: (Math.random() - 0.5) * 0.015,
@@ -204,27 +186,25 @@
                 });
             });
             
-            // Reduce particle count on mobile/low-performance devices
-            const particleCount = isLowPerformanceDevice() ? 10 : 20;
+            // Further reduce particle count for better performance
+            const particleCount = isLowPerformanceDevice() ? 5 : 12; // Reduced from 10/20
+            const particleSegments = isLowPerformanceDevice() ? 8 : 12; // Reduced sphere detail
             
             // Add enhanced floating particles/spheres with varied sizes and colors
             for (let i = 0; i < particleCount; i++) {
                 const size = 0.08 + Math.random() * 0.15;
-                const geometry = new THREE.SphereGeometry(size, 16, 16);
+                const geometry = new THREE.SphereGeometry(size, particleSegments, particleSegments); // Reduced detail
                 const particleColor = colors[Math.floor(Math.random() * colors.length)];
-                const material = new THREE.MeshStandardMaterial({
+                // Use MeshBasicMaterial instead of MeshStandardMaterial for better performance
+                const material = new THREE.MeshBasicMaterial({
                     color: particleColor,
                     transparent: true,
-                    opacity: 0.5 + Math.random() * 0.3,
-                    emissive: particleColor,
-                    emissiveIntensity: 0.6,
-                    metalness: 0.7,
-                    roughness: 0.3
+                    opacity: 0.6 + Math.random() * 0.3
                 });
                 
                 const sphere = new THREE.Mesh(geometry, material);
                 // Distribute across entire page height
-                const yPosition = (Math.random() - 0.5) * 22; // Full page height
+                const yPosition = (Math.random() - 0.5) * 22;
                 sphere.position.set(
                     (Math.random() - 0.5) * 14,
                     yPosition,
@@ -232,21 +212,10 @@
                 );
                 scene.add(sphere);
                 
-                // Add glow to particles
-                const glowGeometry = new THREE.SphereGeometry(size * 1.5, 16, 16);
-                const glowMaterial = new THREE.MeshBasicMaterial({
-                    color: particleColor,
-                    transparent: true,
-                    opacity: 0.15,
-                    side: THREE.BackSide
-                });
-                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-                glow.position.copy(sphere.position);
-                scene.add(glow);
-                
+                // Removed glow mesh for particles to improve performance
                 objects.push({
                     solid: sphere,
-                    glow: glow,
+                    glow: null, // Removed glow mesh
                     basePosition: { 
                         x: sphere.position.x, 
                         y: sphere.position.y, 
@@ -515,24 +484,8 @@
                         obj.solid.material.opacity = 0.3 + Math.sin(time * obj.pulseSpeed) * 0.2;
                     }
                     
-                    // Animate glow
-                    if (obj.glow) {
-                        if (obj.wireframe) {
-                            obj.glow.position.copy(obj.wireframe.position);
-                            obj.glow.rotation.copy(obj.wireframe.rotation);
-                        } else if (obj.solid) {
-                            obj.glow.position.copy(obj.solid.position);
-                            obj.glow.rotation.copy(obj.solid.rotation);
-                        }
-                        
-                        // Pulsing glow size and opacity
-                        if (!obj.glow.userData.baseScale) {
-                            obj.glow.userData.baseScale = obj.glow.scale.x;
-                        }
-                        const glowPulse = 1 + Math.sin(time * obj.pulseSpeed * 1.2) * 0.2;
-                        obj.glow.scale.setScalar(obj.glow.userData.baseScale * glowPulse);
-                        obj.glow.material.opacity = 0.15 + Math.sin(time * obj.pulseSpeed * 1.5) * 0.1;
-                    }
+                    // Removed glow animation for better performance
+                    // Glow meshes have been removed to reduce draw calls
                 });
                 
                 // Update camera position based on scroll with smooth movement

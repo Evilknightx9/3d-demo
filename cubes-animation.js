@@ -96,42 +96,40 @@
         const color = '#6366f1'; // Purple color
         const { width, height } = $container.getBoundingClientRect();
         
-        // Three.js setup
-        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        // Three.js setup - optimized for performance
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        const renderer = new THREE.WebGLRenderer({ 
+            alpha: true, 
+            antialias: !isMobile, // Disable antialiasing on mobile
+            powerPreference: "high-performance",
+            stencil: false,
+            depth: true
+        });
+        renderer.shadowMap.enabled = false; // Disable shadows
+        
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 100);
-        const geometry = new THREE.BoxGeometry(4, 4, 4); // Even larger cubes
+        // Shared geometry for all cubes - better performance
+        const geometry = new THREE.BoxGeometry(4, 4, 4);
         const material = new THREE.MeshBasicMaterial({ 
             color: color, 
             wireframe: true,
             transparent: true,
-            opacity: 0.8, // More visible
-            wireframeLinewidth: 2 // Thicker lines (if supported)
-        });
-        
-        // Add glow effect using emissive
-        const glowMaterial = new THREE.MeshBasicMaterial({ 
-            color: color, 
-            wireframe: true,
-            transparent: true,
-            opacity: 0.4
+            opacity: 0.8
         });
         
         renderer.setSize(width, height);
         // Limit pixel ratio more aggressively for performance
-        const isMobile = window.matchMedia('(max-width: 768px)').matches;
         const maxPixelRatio = isMobile ? 1 : Math.min(window.devicePixelRatio, 1.5);
         renderer.setPixelRatio(maxPixelRatio);
         $container.appendChild(renderer.domElement);
         camera.position.z = 8; // Pulled back to see larger cubes
         
         function createAnimatedCube() {
-            // Create main cube
+            // Create main cube - removed glow cube for better performance
             const cube = new THREE.Mesh(geometry, material);
             
-            // Create glow cube (slightly larger)
-            const glowCube = new THREE.Mesh(new THREE.BoxGeometry(4.2, 4.2, 4.2), glowMaterial);
-            cube.add(glowCube); // Add glow as child
+            // Removed glow cube mesh to reduce draw calls and improve performance
             
             const x = utils.random(-15, 15, 2); // Larger range
             const y = utils.random(-8, 8, 2); // Larger range
@@ -160,8 +158,8 @@
             return isMobile || (isTablet && hardwareConcurrency < 4) || deviceMemory < 4;
         }
         
-        // Reduce cube count on mobile/low-performance devices
-        const cubeCount = isLowPerformanceDevice() ? 8 : 15;
+        // Further reduce cube count for better performance
+        const cubeCount = isLowPerformanceDevice() ? 5 : 10; // Reduced from 8/15
         
         // Create cubes for better visibility
         for (let i = 0; i < cubeCount; i++) {
